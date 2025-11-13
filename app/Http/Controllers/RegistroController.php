@@ -1,79 +1,101 @@
 <?php
 
+// Definimos el namespace del controlador, que sigue la estructura de Laravel
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-
-// Este controlador gestiona los "Registros Físicos" del proyecto FitPadel+.
-// Incluye tres funciones principales:
-// - crear(): muestra el formulario al usuario.
-// - guardar(): valida y guarda los datos en un archivo CSV.
-// - index(): muestra todos los registros en una tabla.
+// Importamos clases necesarias
+use Illuminate\Http\Request; // Para manejar solicitudes HTTP y validar datos
+use App\Models\Registro;     // Modelo Eloquent que representa la tabla 'registros'
 
 class RegistroController extends Controller
 {
-    // Método crear()
-    // Muestra el formulario de registro físico (fecha, pasos, calorías, estado).
-    // Retorna una vista Blade llamada "create.blade.php" ubicada en resources/views/
+    /**
+     * Muestra el formulario de registro
+     * 
+     * Esta función devuelve la vista 'registro.blade.php' donde el usuario puede
+     * ingresar sus datos: nombre, fecha, pasos, calorías y estado.
+     */
     public function crear()
     {
-        return view('crear');
+        // Devuelve la vista 'registro', sin pasar datos adicionales
+        return view('registro');
     }
 
-    // Método guardar()
-    // Recibe los datos del formulario, los valida y los guarda en un archivo CSV.
-    // Luego redirige al listado de registros con un mensaje de confirmación.
+    /**
+     * Guarda los datos del formulario y crea respaldo en CSV
+     * 
+     * Este método se ejecuta cuando el usuario envía el formulario de registro.
+     * Recibe un objeto Request que contiene todos los datos enviados.
+     */
     public function guardar(Request $request)
     {
-        // Validación de los campos: evita datos vacíos o incorrectos.
-        $validated = $request->validate([
-            'fecha' => 'required|date',
-            'pasos' => 'required|integer|min:0',
-            'calorias' => 'required|integer|min:0',
-            'estado' => 'required|in:Bien,Normal,Mal',
+        // 1️ VALIDACIÓN DE DATOS
+        // Laravel valida automáticamente los campos y, si hay errores, redirige de vuelta con mensajes
+        $request->validate([
+            'nombre' => 'required|string|max:50',       // Obligatorio, cadena de máximo 50 caracteres
+            'fecha' => 'required|date',                 // Obligatorio, debe ser fecha válida
+            'pasos' => 'required|numeric|min:0',       // Obligatorio, número >= 0
+            'calorias' => 'required|numeric|min:0',    // Obligatorio, número >= 0
+            'estado' => 'required|in:Bien,Normal,Mal', // Obligatorio, solo uno de estos valores
         ]);
 
-        // Convertimos los datos en una línea CSV (separada por comas)
-        $linea = implode(',', [
-            $validated['fecha'],
-            $validated['pasos'],
-            $validated['calorias'],
-            $validated['estado'],
-        ]) . PHP_EOL; // PHP_EOL añade un salto de línea según el sistema operativo
+        // 2️ GUARDAR EN BASE DE DATOS
+        // Usamos Eloquent ORM para crear un nuevo registro en la tabla 'registros'
+        Registro::create([
+            'nombre' => $request->nombre,       // Campo 'nombre' del formulario
+            'fecha' => $request->fecha,         // Campo 'fecha' del formulario
+            'pasos' => $request->pasos,         // Campo 'pasos' del formulario
+            'calorias' => $request->calorias,   // Campo 'calorias' del formulario
+            'estado' => $request->estado,       // Campo 'estado' del formulario
+        ]);
 
-        // Guardamos la línea en el archivo "registros.csv" dentro de storage/app
-        Storage::append('registros.csv', $linea);
+        // 3️ GUARDAR EN ARCHIVO CSV
+        try {
+            // storage_path('app/registros.csv') → ruta absoluta del archivo en storage/app
+            $fullPath = storage_path('app/registros.csv');
 
-        // Redirigimos al historial de registros con un mensaje de éxito
+            // Si el archivo no existe, creamos la cabecera CSV
+            if (!file_exists($fullPath)) {
+                $cabecera = "Nombre,Fecha,Pasos,Calorías,Estado" . PHP_EOL;
+                // file_put_contents() con LOCK_EX evita que otro proceso escriba al mismo tiempo
+                file_put_contents($fullPath, $cabecera, LOCK_EX);
+            }
+
+            // Creamos la línea de datos separada por comas
+            $linea = implode(',', [
+                $request->nombre,
+                $request->fecha,
+                $request->pasos,
+                $request->calorias,
+                $request->estado,
+            ]) . PHP_EOL; // PHP_EOL asegura salto de línea correcto en cualquier OS
+
+            // Agregamos la línea al final del archivo
+            file_put_contents($fullPath, $linea, FILE_APPEND | LOCK_EX);
+
+        } catch (\Exception $e) {
+            // Si hay un error al escribir el CSV, redirigimos de vuelta con mensaje de error
+            return redirect()->back()->with('error', 'Error al guardar el registro en CSV.');
+        }
+
+        // 4️ REDIRECCIÓN A HISTORIAL CON MENSAJE DE ÉXITO
+        // redirect()->route('registro.index') → redirige a la ruta que muestra todos los registros
+        // with('success', ...) → agrega un mensaje temporal de éxito a la sesión
         return redirect()->route('registro.index')->with('success', 'Registro guardado correctamente.');
     }
 
-    // Método index()
-    // Lee el archivo CSV y muestra todos los registros en una tabla.
+    /**
+     * Muestra el historial de registros
+     * 
+     * Este método obtiene todos los registros de la base de datos, los ordena por fecha descendente,
+     * y los pasa a la vista 'historial.blade.php' usando compact().
+     */
     public function index()
     {
-        $registros = []; // Array donde guardaremos los datos del CSV
-        $path = storage_path('app/registros.csv'); // Ruta completa del archivo CSV
+        // Eloquent ORM → obtiene todos los registros ordenados por fecha descendente
+        $registros = Registro::orderBy('fecha', 'desc')->get();
 
-        // Si el archivo existe, lo abrimos y leemos cada línea
-        if (file_exists($path)) {
-            $file = fopen($path, 'r'); // Abrimos el archivo en modo lectura
-
-            // Cada línea se convierte en un array con fgetcsv()
-            while (($data = fgetcsv($file)) !== false) {
-                $registros[] = [
-                    'fecha' => $data[0],
-                    'pasos' => $data[1],
-                    'calorias' => $data[2],
-                    'estado' => $data[3],
-                ];
-            }
-
-            fclose($file); // Cerramos el archivo tras leerlo
-        }
-
-        // Pasamos el array $registros a la vista "index.blade.php"
-        return view('index', compact('registros'));
+        // compact('registros') → pasa la variable $registros a la vista
+        return view('historial', compact('registros'));
     }
 }
