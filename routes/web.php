@@ -3,8 +3,12 @@
 // Importamos la clase Route para definir rutas web
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
+
 // Importamos el controlador RegistroController para manejar la lógica de registro
 use App\Http\Controllers\RegistroController;
+use App\Http\Controllers\AdminController;
 
 /*
 
@@ -72,9 +76,13 @@ Route::middleware([
     })->name('dashboard');
 });
 
+Route::get('/register', [RegisterController::class, 'showRegisterForm'])->name('register');
+Route::post('/register', [RegisterController::class, 'register']);
+
+Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [LoginController::class, 'login']);
+
 // routes/web.php
 Route::middleware(['auth'])->group(function () {
     Route::get('/admin', [AdminController::class, 'index'])->name('admin.index');
 });
-
-

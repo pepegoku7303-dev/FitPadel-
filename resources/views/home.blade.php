@@ -48,7 +48,8 @@
             <div class="space-x-4">
                 <!-- space-x-4 → espacio horizontal entre cada enlace -->
 
-                <a href="{{ route('dashboard') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">Login</a>
+                <a href="{{ route('login') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">Login</a>
+                <a href="{{ route('register') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">Register</a>
                 <!-- <a href="#" class="text-gray-600 hover:text-indigo-600">Retos</a> -->
 
                 <!-- Botón para ir al formulario de registro físico -->
@@ -56,6 +57,12 @@
                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">
                     Añadir registro
                 </a>
+                
+                 <a href="{{ route('admin.index') }}" 
+                   class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">
+                    Panel Admin
+                </a>
+                
                 <!-- 
                     bg-indigo-600 → fondo azul
                     text-white → texto blanco
